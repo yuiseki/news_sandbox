@@ -1,0 +1,155 @@
+<!doctype html>
+<html class="no-js" lang="">
+  <head>
+    <meta charset="utf-8">
+    <title>news client</title>
+    <link rel="stylesheet" href="https://storage.googleapis.com/code.getmdl.io/1.0.2/material.indigo-pink.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <script src="https://storage.googleapis.com/code.getmdl.io/1.0.2/material.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.2.1/backbone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.6/moment-with-locales.js"></script>
+    <script src="http://coffeescript.org/extras/coffee-script.js"></script>
+    <style>
+      body{ padding:5px; background:silver; }
+      .demo-card-wide.mdl-card {
+        width: 800px;
+        margin: 10px;
+      }
+      .demo-card-wide.mdl-card li {
+        margin: 5px;
+      }
+
+      .demo-card-wide > .mdl-card__title {
+        color: #fff;
+        height: 300px;
+        padding: 10px;
+      }
+      .demo-card-wide .mdl-card__supporting-text {
+        width: auto;
+      }
+      .demo-card-wide .description {
+        font-size: 20px;
+        line-height: 23px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      .demo-card-wide > .mdl-card__title > h2 {
+        background: rgba(0, 0, 0, 0.5);
+        padding: 5px;
+        border-radius: 2px
+      }
+      .demo-card-wide > .mdl-card__menu {
+        color: #fff;
+      }
+    </style>
+
+<script type="text/coffeescript">
+window.App = window.App ? {}
+class App.News extends Backbone.Model
+  idAttribute: "url"
+  showSummary: ->
+    summary = @get("generated_summary")
+    lines = summary.split("\n")
+    ul = $("<ul/>")
+    _.each lines, (line)->
+      li = $("<li/>").text(line)
+      li.appendTo(ul)
+    return ul.prop("outerHTML")
+  showTime: ->
+    unixtime = @get('published_at')['$date']
+    time = moment(unixtime)
+    return time.format("YYYY/MM/DD HH:mm")
+  showDomain: ->
+    list = @get('url').split('/')
+    return list[2]
+class App.NewsList extends Backbone.Collection
+  model: App.News
+  page: 0
+  url: ->
+    "/news?page=#{@page}"
+class App.NewsListView extends Backbone.View
+  initialize: (opts)->
+    @index = 0
+    @col = opts.col
+    @template = _.template($('#newsListTemplate').html())
+    @interval = null
+    @render()
+    super opts
+  start: ->
+    @interval = setInterval =>
+      @render()
+      @index = @index+1
+    , 5000
+    @render()
+    @index = @index+1
+  render: ->
+    if @col.models.length is 0
+      return
+    if @index == @col.models.length
+      clearInterval(@interval)
+      console.log "load next news"
+      App.router.navigate("#"+(App.newsList.page+1), true)
+      return @
+    #models = @col.models.slice(@index, @index+1)
+    models = @col.models
+    html = @template({models:models})
+    @$el.html(html)
+    return @
+class App.Router extends Backbone.Router
+  routes:
+    '*hash': 'default'
+  default: (hash)->
+    if hash is null or hash is ""
+      App.router.navigate("#1", true)
+      return
+    App.newsList = new App.NewsList()
+    App.newsList.page = hash
+    App.newsListView = new App.NewsListView
+      col: App.newsList
+      el: $('#newsListView')
+    App.newsList.fetch
+      success: ->
+        App.newsListView.render()
+$(document).ready ->
+  App.router = new App.Router()
+  Backbone.history.start()
+
+</script>
+
+<script id="newsListTemplate" type="text/template">
+<% _.each(models, function(item){ %>
+  <div class="mdl-card mdl-shadow--2dp demo-card-wide">
+    <div class="mdl-card__title" style="background: url(<%= item.get('og_image') %>) center / cover;">
+      <h2 class="mdl-card__title-text">
+        <%= item.get("title") %>
+      </h2>
+    </div>
+    <div class="mdl-card__supporting-text">
+      <div class="description">
+        <%= item.get("og_description") %>
+      </div>
+      <div class="extract_content">
+        <%= item.showSummary() %>
+      </div>
+    </div>
+    <div class="mdl-card__actions mdl-card--border">
+      <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect"
+        href="<%= item.get('url') %>"
+      >
+      <%= item.showDomain() %>
+      -
+      <%= item.showTime() %>
+      </a>
+    </div>
+  </div>
+<% }); %>
+</script>
+
+  </head>
+  <body>
+    <div id="newsListView">
+    </div>
+  </body>
+</html>
