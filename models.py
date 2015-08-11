@@ -10,6 +10,10 @@ import MeCab
 from mongoengine.document import Document
 from mongoengine import fields
 
+from heapq import merge
+
+mecab = MeCab.Tagger("-Ochasen -d /usr/local/lib/mecab/dic/mecab-ipadic-neologd")
+
 class TextBlock:
   def __init__(self, soup, index):
     self.soup = soup
@@ -54,6 +58,16 @@ class TextBlock:
     #for word in badwords:
     #  if word in str(self.soup):
     #    self.score = self.score*0.01
+
+class Tweets(Document):
+  url  = fields.StringField(required=True)
+  tweet_id = fields.StringField()
+  text = fields.StringField()
+  user_id = fields.StringField()
+  user_name = fields.StringField()
+  screen_name = fields.StringField()
+  created_at = fields.DateTimeField()
+  
 
 class News(Document):
   url  = fields.StringField(unique=True, required=True)
@@ -100,6 +114,7 @@ class News(Document):
       self.get_facebook_count()
     if self.hatebu_count is None:
       self.get_hatebu_count()
+    self.generate_summary()
 
   def get_twitter_count(self):
     res = requests.get("http://urls.api.twitter.com/1/urls/count.json?url="+self.url)
@@ -134,7 +149,6 @@ class News(Document):
   def generate_summary(self):
     def extract_words(text):
       text =  text.encode("utf-8") if isinstance(text,unicode) else text
-      mecab = MeCab.Tagger("-Ochasen -d /usr/local/lib/mecab/dic/mecab-ipadic-neologd")
       node = mecab.parseToNode(text)
       words = []
       while node:
@@ -153,7 +167,6 @@ class News(Document):
       self.title_noun_list = extract_words(self.og_title)
     if not self.og_description is None:
       self.description_noun_list = extract_words(self.og_description)
-    from heapq import merge
     self.frequent_noun_list = list(merge(self.title_noun_list, self.description_noun_list))
 
     if len(self.extract_content) is 0:
@@ -189,7 +202,9 @@ class News(Document):
         return None
     og_title = get_select('meta[property="og:title"]')
     if og_title is None:
-      og_title = get_select('meta[name="title"]')
+      title = self.soup.select("title")
+      if len(title) > 0:
+        og_title = self.soup.select("title")[0].getText().strip()
     self.og_title = og_title
     og_description = get_select('meta[property="og:description"]')
     if og_description is None:
@@ -212,6 +227,10 @@ class News(Document):
     score_sorted = sorted(text_blocks, key=lambda x: -x.score)
     if len(score_sorted) is 0:
       self.extract_content = "null"
+      return
+
+    if len(score_sorted) is 1:
+      self.extract_content = score_sorted[0].text
       return
 
     def clean_lines(text):

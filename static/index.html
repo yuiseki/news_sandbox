@@ -23,14 +23,14 @@
 
       .demo-card-wide > .mdl-card__title {
         color: #fff;
-        height: 300px;
+        height: 200px;
         padding: 10px;
       }
       .demo-card-wide .mdl-card__supporting-text {
         width: auto;
       }
       .demo-card-wide .description {
-        font-size: 20px;
+        font-size: 14px;
         line-height: 23px;
         font-weight: bold;
         margin-bottom: 10px;
@@ -58,7 +58,7 @@ class App.News extends Backbone.Model
       li.appendTo(ul)
     return ul.prop("outerHTML")
   showTime: ->
-    unixtime = @get('published_at')['$date']
+    unixtime = @get('published_at')
     time = moment(unixtime)
     return time.format("YYYY/MM/DD HH:mm")
   showDomain: ->
@@ -68,7 +68,11 @@ class App.NewsList extends Backbone.Collection
   model: App.News
   page: 0
   url: ->
-    "/news?page=#{@page}"
+    "/rank"
+    #"/news?page=#{@page}"
+  parse: (resp)->
+    console.log resp.results
+    return resp.results
 class App.NewsListView extends Backbone.View
   initialize: (opts)->
     @index = 0
@@ -123,7 +127,7 @@ $(document).ready ->
   <div class="mdl-card mdl-shadow--2dp demo-card-wide">
     <div class="mdl-card__title" style="background: url(<%= item.get('og_image') %>) center / cover;">
       <h2 class="mdl-card__title-text">
-        <%= item.get("title") %>
+        <%= item.get("og_title") %>
       </h2>
     </div>
     <div class="mdl-card__supporting-text">
@@ -133,6 +137,7 @@ $(document).ready ->
       <div class="extract_content">
         <%= item.showSummary() %>
       </div>
+      <%= item.get("day_count") %> tweet
     </div>
     <div class="mdl-card__actions mdl-card--border">
       <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect"
